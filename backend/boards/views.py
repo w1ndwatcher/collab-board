@@ -1,20 +1,85 @@
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from rest_framework import status, viewsets
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
+from rest_framework import generics, permissions, serializers, status, viewsets
 from rest_framework.response import Response
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import Board, Card
 from .serializers import BoardSerializer, CardSerializer
 
 
+class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    username_field = "email"
+
+    def validate(self, attrs):
+        user = authenticate(
+            username=attrs["email"], password=attrs["password"]
+        )
+        if user is None or not user.is_active:
+            raise serializers.ValidationError(
+                "No active account found with the given credentials"
+            )
+        refresh = RefreshToken.for_user(user)
+        return {"access": str(refresh.access_token), "refresh": str(refresh)}
+
+
+class EmailTokenObtainPairView(TokenObtainPairView):
+    serializer_class = EmailTokenObtainPairSerializer
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(
+        max_length=150, write_only=True, required=True, allow_blank=False
+    )
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ["name", "email", "password"]
+
+    def create(self, validated_data):
+        return User.objects.create_user(
+            username=validated_data["email"],
+            email=validated_data["email"],
+            password=validated_data["password"],
+            first_name=validated_data["name"],
+        )
+
+
+class RegisterView(generics.CreateAPIView):
+    serializer_class = RegisterSerializer
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+
+class UserListSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="first_name", read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "name"]
+
+
+class UserListView(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
 class BoardViewSet(viewsets.ModelViewSet):
     queryset = Board.objects.all()
     serializer_class = BoardSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 
 class CardViewSet(viewsets.ModelViewSet):
     queryset = Card.objects.select_related("board")
     serializer_class = CardSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def _broadcast(self, board_id, event_type, data):
         channel_layer = get_channel_layer()
@@ -24,7 +89,9 @@ class CardViewSet(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        card = serializer.save()
+        card = serializer.save(
+            created_by=self.request.user, updated_by=self.request.user
+        )
         self._broadcast(
             card.board_id, "card_created", CardSerializer(card).data
         )
@@ -46,10 +113,10 @@ class CardViewSet(viewsets.ModelViewSet):
                 )
 
         serializer.is_valid(raise_exception=True)
+        serializer.save(updated_by=self.request.user)
         moved = "column" in serializer.validated_data or (
             "position" in serializer.validated_data
         )
-        self.perform_update(serializer)
         event_type = "card_moved" if moved else "card_updated"
         self._broadcast(
             instance.board_id,
