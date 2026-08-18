@@ -1,0 +1,68 @@
+/* BoardPage theme — overrides Bootstrap vars + small utilities. */
+
+:root {
+  --bs-primary: #7c5cbf;
+  --bs-primary-rgb: 124, 92, 191;
+
+  --status-todo: #8a93a6;
+  --status-doing: #c9901b;
+  --status-done: #4c9a6e;
+
+  --tint-todo: #e9edf5;
+  --tint-doing: #f7e9ce;
+  --tint-done: #e4f0e8;
+
+  --bg-nav: rgba(255, 255, 255, 0.6);
+}
+
+body {
+  background: linear-gradient(135deg, #fff6e5 0%, #f3ecf9 60%, #ece5f8 100%);
+  min-height: 100vh;
+}
+
+.board-navbar {
+  background: var(--bg-nav);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.board-logo {
+  color: var(--bs-primary);
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-decoration: none;
+}
+
+.board-logo:hover {
+  color: var(--bs-primary);
+  opacity: 0.85;
+}
+
+.btn-new-board,
+.btn-primary {
+  background: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: #fff;
+}
+
+.btn-new-board:hover,
+.btn-primary:hover {
+  background: #6a4faa;
+  border-color: #6a4faa;
+  color: #fff;
+}
+
+/* Column header status tints. */
+.col-header-todo { background: var(--tint-todo); border-bottom: 3px solid var(--status-todo); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.col-header-doing { background: var(--tint-doing); border-bottom: 3px solid var(--status-doing); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.col-header-done { background: var(--tint-done); border-bottom: 3px solid var(--status-done); box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+
+/* Status accent text for badges/counts. */
+.accent-todo { color: var(--status-todo); }
+.accent-doing { color: var(--status-doing); }
+.accent-done { color: var(--status-done); }
+
+/* Card left border matching column status. */
+.card-accent-todo { border-left: 4px solid var(--status-todo); }
+.card-accent-doing { border-left: 4px solid var(--status-doing); }
+.card-accent-done { border-left: 4px solid var(--status-done); }
