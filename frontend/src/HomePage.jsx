@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { fetchWithAuth } from "./auth.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -10,7 +11,7 @@ export default function HomePage() {
   const [boards, setBoards] = useState([]);
 
   useEffect(() => {
-    fetch(`${API_URL}/api/boards/`)
+    fetchWithAuth(`${API_URL}/api/boards/`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -22,7 +23,7 @@ export default function HomePage() {
   async function createBoard() {
     setBusy(true);
     try {
-      const res = await fetch(`${API_URL}/api/boards/`, {
+      const res = await fetchWithAuth(`${API_URL}/api/boards/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() || "Untitled board" }),

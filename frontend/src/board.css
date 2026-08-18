@@ -66,3 +66,44 @@ body {
 .card-accent-todo { border-left: 4px solid var(--status-todo); }
 .card-accent-doing { border-left: 4px solid var(--status-doing); }
 .card-accent-done { border-left: 4px solid var(--status-done); }
+
+/* Card edit / avatars / assignee */
+.card-title-text { cursor: text; }
+.drag-handle {
+  cursor: grab;
+  color: #8a93a6;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 4px;
+  user-select: none;
+}
+.card-avatars { display: inline-flex; gap: 4px; }
+.avatar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: default;
+}
+.avatar-c { background: var(--status-todo); border: 1px solid #fff; }
+.avatar-u { background: var(--status-doing); border: 1px solid #fff; }
+.avatar-a { background: var(--status-done); border: 1px solid #fff; }
+.assign-btn { line-height: 1; }
+.assign-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 30;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}

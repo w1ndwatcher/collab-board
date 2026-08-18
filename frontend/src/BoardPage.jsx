@@ -4,6 +4,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
   closestCenter,
@@ -14,6 +15,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { fetchWithAuth, getToken, logout } from "./auth.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000";
@@ -36,7 +38,63 @@ function columnOf(key) {
   return COLUMNS.find((c) => c.key === key);
 }
 
-function SortableCard({ card, active, onConflictClear }) {
+function displayName(user) {
+  return (user && user.name) || (user && user.email) || "?";
+}
+
+function initials(user) {
+  const name = displayName(user);
+  if (name === "?") return "?";
+  if (name.includes("@")) {
+    // No name on record (pre-existing account): fall back to email initial.
+    const local = name.split("@")[0];
+    return local.charAt(0).toUpperCase() || "?";
+  }
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  }
+  return parts[0].charAt(0).toUpperCase() || "?";
+}
+
+function cardTooltip(card) {
+  const created = card.created_by ? displayName(card.created_by) : "—";
+  const updated = card.updated_by ? displayName(card.updated_by) : "—";
+  const assigned = card.assignee ? displayName(card.assignee) : "Unassigned";
+  return [
+    `Created By: ${created}`,
+    `Last Updated By: ${updated}`,
+    `Assigned to: ${assigned}`,
+  ].join("\n");
+}
+
+function CardAvatars({ card }) {
+  const badges = [];
+  if (card.created_by) badges.push({ tag: "C", user: card.created_by });
+  if (
+    card.updated_by &&
+    (!card.created_by || card.updated_by.id !== card.created_by.id)
+  ) {
+    badges.push({ tag: "U", user: card.updated_by });
+  }
+  if (card.assignee) badges.push({ tag: "A", user: card.assignee });
+  return (
+    <div className="card-avatars">
+      {badges.slice(0, 3).map((b) => (
+        <span
+          key={b.tag}
+          className={`avatar-badge avatar-${b.tag.toLowerCase()}`}
+          title={displayName(b.user)}
+        >
+          {b.tag}
+          {initials(b.user)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function SortableCard({ card, users, onSaveTitle, onAssign, onConflictClear }) {
   const {
     attributes,
     listeners,
@@ -45,6 +103,11 @@ function SortableCard({ card, active, onConflictClear }) {
     transition,
     isDragging,
   } = useSortable({ id: card.id });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [assignOpen, setAssignOpen] = useState(false);
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -52,11 +115,70 @@ function SortableCard({ card, active, onConflictClear }) {
   };
   const col = columnOf(card.column);
   const accent = col ? col.cardClass : "";
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (!assignOpen) return;
+    function onDocClick(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setAssignOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [assignOpen]);
+
+  function startEdit() {
+    setDraft(card.title);
+    setEditing(true);
+  }
+
+  function saveTitle() {
+    const trimmed = draft.trim();
+    setEditing(false);
+    if (!trimmed || trimmed === card.title) return;
+    onSaveTitle(card.id, trimmed);
+  }
+
+  function onTitleKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveTitle();
+    } else if (e.key === "Escape") {
+      setEditing(false);
+    }
+  }
+
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={`card mb-1 shadow-sm ${accent}`}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      title={cardTooltip(card)}
+      className={`card mb-1 shadow-sm ${accent}`}
+    >
       <div className="card-body py-2 px-3">
-        <div className="d-flex justify-content-between align-items-center">
-          <span className="small">{card.title}</span>
+        <div className="d-flex justify-content-between align-items-start">
+          {editing ? (
+            <input
+              ref={inputRef}
+              className="form-control form-control-sm"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={saveTitle}
+              onKeyDown={onTitleKeyDown}
+            />
+          ) : (
+            <span className="small card-title-text" onClick={startEdit} title="Click to edit">
+              {card.title}
+            </span>
+          )}
           {card.conflict && (
             <span
               className="badge text-bg-warning ms-2"
@@ -66,7 +188,64 @@ function SortableCard({ card, active, onConflictClear }) {
             </span>
           )}
         </div>
+        <div className="d-flex justify-content-between align-items-center mt-1">
+          <span {...listeners} className="drag-handle" title="Drag to move">
+            &#8801;
+          </span>
+          <div className="d-flex align-items-center" ref={dropdownRef}>
+            <CardAvatars card={card} />
+            <div className="position-relative ms-1">
+              <button
+                className="btn btn-sm btn-outline-secondary py-0 px-1 assign-btn"
+                onClick={() => setAssignOpen((o) => !o)}
+              >
+                +
+              </button>
+              {assignOpen && (
+                <div className="assign-menu">
+                  <div className="assign-menu-header small text-muted px-2 py-1">
+                    Assign to
+                  </div>
+                  <button
+                    className="dropdown-item small"
+                    onClick={() => {
+                      setAssignOpen(false);
+                      onAssign(card.id, null);
+                    }}
+                  >
+                    Unassign
+                  </button>
+                  {[...users]
+                    .sort((a, b) =>
+                      displayName(a).localeCompare(displayName(b))
+                    )
+                    .map((u) => (
+                    <button
+                      key={u.id}
+                      className="dropdown-item small"
+                      onClick={() => {
+                        setAssignOpen(false);
+                        onAssign(card.id, u.id);
+                      }}
+                    >
+                      {displayName(u)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function ColumnBody({ id, children }) {
+  const { setNodeRef } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className="card-body">
+      {children}
     </div>
   );
 }
@@ -80,6 +259,7 @@ export default function BoardPage() {
   const [notFound, setNotFound] = useState(false);
   const [activeId, setActiveId] = useState(null);
   const [drafts, setDrafts] = useState({ todo: "", doing: "", done: "" });
+  const [users, setUsers] = useState([]);
   const wsRef = useRef(null);
   const cardsRef = useRef(cards);
   cardsRef.current = cards;
@@ -127,7 +307,7 @@ export default function BoardPage() {
     setLoading(true);
     setError(null);
     setNotFound(false);
-    fetch(`${API_URL}/api/boards/${boardId}/`)
+    fetchWithAuth(`${API_URL}/api/boards/${boardId}/`)
       .then((r) => {
         if (r.status === 404) {
           setNotFound(true);
@@ -149,10 +329,18 @@ export default function BoardPage() {
       });
   }, [boardId]);
 
+  // Load the user list once for the assignee dropdown (shared across cards).
+  useEffect(() => {
+    fetchWithAuth(`${API_URL}/api/auth/users/`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, []);
+
   // Open the websocket and wire live event handlers directly to state.
   useEffect(() => {
     if (notFound) return;
-    const ws = new WebSocket(`${WS_URL}/ws/boards/${boardId}/`);
+    const ws = new WebSocket(`${WS_URL}/ws/boards/${boardId}/?token=${getToken()}`);
     wsRef.current = ws;
     ws.onmessage = (evt) => {
       let msg;
@@ -193,62 +381,165 @@ export default function BoardPage() {
     return POSITION_GAP;
   }
 
-  async function moveCard(card, column, index, optimistic = false) {
-    const columnCards = byColumn[column] || [];
-    const newPosition = midpointPosition(columnCards, index, card.id);
-    if (optimistic) {
-      setCards((prev) =>
-        prev.map((c) =>
-          c.id === card.id
-            ? { ...c, column, position: newPosition, conflict: false }
-            : c
-        )
-      );
-    }
+  // Shared optimistic-PATCH helper with the 409 conflict pattern used for
+  // moves, title edits, and assignee changes.
+  async function patchCard(cardId, patchBody, applyOptimistic) {
+    const current = cardsRef.current.find((c) => c.id === cardId);
+    if (!current) return;
+    if (applyOptimistic) applyOptimistic(current);
     try {
-      const res = await fetch(`${API_URL}/api/cards/${card.id}/`, {
+      const res = await fetchWithAuth(`${API_URL}/api/cards/${cardId}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          column,
-          position: newPosition,
-          expected_updated_at: card.updated_at,
+          ...patchBody,
+          expected_updated_at: current.updated_at,
         }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 409) {
-        // Someone else changed it first; take their version and flag it.
         setCards((prev) =>
           prev.map((c) =>
-            c.id === card.id
-              ? { ...c, ...data, conflict: true }
-              : c
+            c.id === cardId ? { ...c, ...data, conflict: true } : c
           )
         );
-        flagConflict(card.id);
+        flagConflict(cardId);
         return;
       }
       if (!res.ok) {
-        // Non-conflict error: revert the optimistic move.
         setCards((prev) =>
-          prev.map((c) => (c.id === card.id ? { ...c, ...card } : c))
+          prev.map((c) => (c.id === cardId ? current : c))
         );
         return;
       }
-      // Success: adopt the server-confirmed state (authoritative).
       setCards((prev) =>
-        prev.map((c) => (c.id === card.id ? { ...c, ...data } : c))
+        prev.map((c) => (c.id === cardId ? { ...c, ...data } : c))
       );
     } catch (e) {
-      // Network error: revert the optimistic move.
       setCards((prev) =>
-        prev.map((c) => (c.id === card.id ? { ...c, ...card } : c))
+        prev.map((c) => (c.id === cardId ? current : c))
       );
     }
   }
 
+  function moveCard(card, column, index, optimistic = false) {
+    const columnCards = byColumn[column] || [];
+    const newPosition = midpointPosition(columnCards, index, card.id);
+    patchCard(card.id, { column, position: newPosition }, (cur) => {
+      if (optimistic) {
+        setCards((prev) =>
+          prev.map((c) =>
+            c.id === card.id
+              ? { ...c, column, position: newPosition, conflict: false }
+              : c
+          )
+        );
+      }
+    });
+  }
+
+  function saveTitle(cardId, newTitle) {
+    patchCard(cardId, { title: newTitle }, (cur) => {
+      setCards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, title: newTitle } : c))
+      );
+    });
+  }
+
+  function assignCard(cardId, assigneeId) {
+    patchCard(cardId, { assignee_id: assigneeId }, (cur) => {
+      setCards((prev) =>
+        prev.map((c) => {
+          if (c.id !== cardId) return c;
+          const assignee =
+            assigneeId == null
+              ? null
+              : users.find((u) => u.id === assigneeId) || null;
+          return { ...c, assignee, conflict: false };
+        })
+      );
+    });
+  }
+
   function onDragStart(e) {
     setActiveId(e.active.id);
+  }
+
+  // Live-reparent the dragged card into whichever column/position the pointer
+  // is over during the drag. SortableContext is per-column, so without this a
+  // cross-column move would never register in the target column's list.
+  function onDragOver(e) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const activeCard = cardsRef.current.find((c) => c.id === active.id);
+    if (!activeCard) return;
+
+    let targetColumn = null;
+    let overIndex = -1;
+
+    const overCard = cardsRef.current.find((c) => c.id === over.id);
+    if (overCard) {
+      targetColumn = overCard.column;
+      const col = byColumn[targetColumn] || [];
+      overIndex = col.findIndex((c) => c.id === overCard.id);
+      if (overIndex < 0) return;
+    } else if (typeof over.id === "string" && over.id.startsWith("column-")) {
+      targetColumn = over.id.slice("column-".length);
+      overIndex = (byColumn[targetColumn] || []).length;
+    } else {
+      return;
+    }
+
+    if (targetColumn === activeCard.column) {
+      const col = byColumn[targetColumn] || [];
+      const curIndex = col.findIndex((c) => c.id === activeCard.id);
+      if (curIndex === overIndex || curIndex === -1) return;
+      const next = col.slice();
+      next.splice(curIndex, 1);
+      next.splice(overIndex, 0, activeCard);
+      setCards((prev) =>
+        prev.map((c) => {
+          const idx = next.findIndex((x) => x.id === c.id);
+          if (idx === -1) return c;
+          return { ...c, position: next[idx].position };
+        })
+      );
+      return;
+    }
+
+    const targetCol = byColumn[targetColumn] || [];
+    const others = targetCol.filter((c) => c.id !== activeCard.id);
+    const insertAt = Math.min(overIndex, others.length);
+    const prev = others[insertAt - 1];
+    const next = others[insertAt];
+    const newPosition = prev && next
+      ? (prev.position + next.position) / 2
+      : prev
+        ? prev.position + POSITION_GAP
+        : next
+          ? next.position / 2
+          : POSITION_GAP;
+    setCards((prev) =>
+      prev.map((c) =>
+        c.id === activeCard.id
+          ? { ...c, column: targetColumn, position: newPosition }
+          : c
+      )
+    );
+  }
+
+  // Persist the (already-reparented-by-onDragOver) position with the existing
+  // conflict-check PATCH. No midpoint recomputation here — state holds it.
+  function moveCardTo(cardId, column, position) {
+    patchCard(cardId, { column, position }, (cur) => {
+      setCards((prev) =>
+        prev.map((c) =>
+          c.id === cardId
+            ? { ...c, column, position, conflict: false }
+            : c
+        )
+      );
+    });
   }
 
   function onDragEnd(e) {
@@ -257,22 +548,7 @@ export default function BoardPage() {
     if (!over) return;
     const dragged = cardsRef.current.find((c) => c.id === active.id);
     if (!dragged) return;
-    // Determine target column: if dropping onto another card, use its column.
-    let column = dragged.column;
-    let index = -1;
-    const overCard = cardsRef.current.find((c) => c.id === over.id);
-    if (overCard) {
-      column = overCard.column;
-      const col = byColumn[column] || [];
-      index = col.findIndex((c) => c.id === overCard.id);
-    }
-    if (index < 0) {
-      index = (byColumn[column] || []).length;
-    }
-    if (column === dragged.column && index === byColumn[dragged.column].findIndex((c) => c.id === dragged.id)) {
-      return; // no-op
-    }
-    moveCard(dragged, column, index, true);
+    moveCardTo(dragged.id, dragged.column, dragged.position);
   }
 
   async function addCard(column) {
@@ -280,7 +556,7 @@ export default function BoardPage() {
     if (!title) return;
     const col = byColumn[column] || [];
     const position = col.length ? col[col.length - 1].position + POSITION_GAP : POSITION_GAP;
-    const res = await fetch(`${API_URL}/api/cards/`, {
+    const res = await fetchWithAuth(`${API_URL}/api/cards/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ board: boardId, title, column, position }),
@@ -303,6 +579,9 @@ export default function BoardPage() {
           <Link to="/" className="btn btn-new-board btn-sm">
             New board
           </Link>
+          <button className="btn btn-outline-secondary btn-sm" onClick={logout}>
+            Logout
+          </button>
         </nav>
         <div className="container d-flex flex-column align-items-center py-5">
           <h1 className="h4 mb-3">Board not found</h1>
@@ -325,6 +604,9 @@ export default function BoardPage() {
       <Link to="/" className="btn btn-new-board btn-sm">
         New board
       </Link>
+      <button className="btn btn-outline-secondary btn-sm" onClick={logout}>
+        Logout
+      </button>
     </nav>
   );
 
@@ -336,6 +618,7 @@ export default function BoardPage() {
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={onDragStart}
+        onDragOver={onDragOver}
         onDragEnd={onDragEnd}
       >
         <div className="row">
@@ -348,7 +631,7 @@ export default function BoardPage() {
                     {(byColumn[col.key] || []).length}
                   </span>
                 </div>
-                <div className="card-body">
+                <ColumnBody id={`column-${col.key}`}>
                   <SortableContext
                     items={(byColumn[col.key] || []).map((c) => c.id)}
                     strategy={verticalListSortingStrategy}
@@ -357,7 +640,9 @@ export default function BoardPage() {
                       <SortableCard
                         key={c.id}
                         card={c}
-                        active={activeId === c.id}
+                        users={users}
+                        onSaveTitle={saveTitle}
+                        onAssign={assignCard}
                         onConflictClear={() =>
                           setCards((prev) =>
                             prev.map((x) =>
@@ -385,7 +670,7 @@ export default function BoardPage() {
                       Add
                     </button>
                   </div>
-                </div>
+                </ColumnBody>
               </div>
             </div>
           ))}
