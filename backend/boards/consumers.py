@@ -1,4 +1,7 @@
+import json
+
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from rest_framework.utils.encoders import JSONEncoder
 
 
 class BoardConsumer(AsyncJsonWebsocketConsumer):
@@ -36,4 +39,9 @@ class BoardConsumer(AsyncJsonWebsocketConsumer):
 
     async def _broadcast(self, event_type, event):
         payload = event.get("data", {})
-        await self.send_json({"type": event_type, "data": payload})
+        await self.send(
+            text_data=json.dumps(
+                {"type": event_type, "data": payload},
+                cls=JSONEncoder,
+            )
+        )
