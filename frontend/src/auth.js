@@ -12,13 +12,33 @@ export function clearToken() {
   localStorage.removeItem("access_token");
 }
 
+// Turn a DRF error response (or a fetch failure) into a friendly message.
+export async function apiErrorMessage(res, fallback) {
+  try {
+    const data = await res.json();
+    if (typeof data === "string" && data) return data;
+    if (data && data.detail) return data.detail;
+    if (data && typeof data === "object") {
+      const msgs = Object.values(data).flat().filter(Boolean);
+      if (msgs.length) return msgs.join(" ");
+    }
+  } catch (e) {
+    /* not JSON — fall through to fallback */
+  }
+  return fallback;
+}
+
 export async function login(email, password) {
   const res = await fetch(`${API_URL}/api/auth/login/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) throw new Error(`Login failed (${res.status})`);
+  if (!res.ok) {
+    throw new Error(
+      await apiErrorMessage(res, "Login failed. Please check your email and password.")
+    );
+  }
   const data = await res.json();
   setToken(data.access);
   return data;
@@ -30,7 +50,11 @@ export async function register(name, email, password) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password }),
   });
-  if (!res.ok) throw new Error(`Register failed (${res.status})`);
+  if (!res.ok) {
+    throw new Error(
+      await apiErrorMessage(res, "Registration failed. Please try again.")
+    );
+  }
   return res.json();
 }
 

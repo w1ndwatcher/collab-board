@@ -15,7 +15,8 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { fetchWithAuth, getToken, logout } from "./auth.js";
+import ReactMarkdown from "react-markdown";
+import { apiErrorMessage, fetchWithAuth, getToken, logout } from "./auth.js";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000";
@@ -260,6 +261,9 @@ export default function BoardPage() {
   const [activeId, setActiveId] = useState(null);
   const [drafts, setDrafts] = useState({ todo: "", doing: "", done: "" });
   const [users, setUsers] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
   const wsRef = useRef(null);
   const cardsRef = useRef(cards);
   cardsRef.current = cards;
@@ -324,7 +328,7 @@ export default function BoardPage() {
         setLoading(false);
       })
       .catch((e) => {
-        setError(String(e));
+        setError("Could not load the board. Please try again.");
         setLoading(false);
       });
   }, [boardId]);
@@ -595,6 +599,31 @@ export default function BoardPage() {
       </div>
     );
 
+  async function generateSummary() {
+    setSummaryLoading(true);
+    setSummaryError(null);
+    setSummary(null);
+    try {
+      const res = await fetchWithAuth(
+        `${API_URL}/api/boards/${boardId}/summary/`,
+        { method: "POST" }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSummaryError(
+          data.detail ||
+            "Could not generate the summary. Please try again."
+        );
+        return;
+      }
+      setSummary(data.summary);
+    } catch (e) {
+      setSummaryError("Could not generate the summary. Please try again.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
+
   const activeCard = cards.find((c) => c.id === activeId);
   const navBar = (
     <nav className="board-navbar py-2 px-3 mb-4 d-flex justify-content-between align-items-center">
@@ -613,7 +642,31 @@ export default function BoardPage() {
   return (
     <div className="container-fluid py-4">
       {navBar}
-      <h1 className="h4 mb-4">{board ? board.name : "Board"}</h1>
+      <h1 className="h4 mb-3">{board ? board.name : "Board"}</h1>
+      <div className="mb-4">
+        <button
+          className="btn btn-outline-primary btn-sm"
+          onClick={generateSummary}
+          disabled={summaryLoading}
+        >
+          {summaryLoading ? "Generating..." : summary ? "Regenerate Summary" : "Generate Board Summary"}
+        </button>
+        {summaryError && (
+          <div className="alert alert-danger small mt-2 mb-0">{summaryError}</div>
+        )}
+        {summary && (
+          <div className="card mt-2 shadow-sm">
+            <div className="card-body">
+              <div className="card-title small text-muted mb-2">
+                Board Summary
+              </div>
+              <div className="small summary-content">
+                <ReactMarkdown>{summary}</ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
