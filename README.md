@@ -2,6 +2,10 @@
 
 A real-time collaborative kanban board. Users register and log in, create boards, and work on them together. Card changes broadcast over WebSockets so everyone on a board sees updates live, with no refresh.
 
+## Demo
+
+[Live Demo](https://collab-board-yu78.vercel.app/login)
+
 ## Tech Stack
 
 - **Backend:** Django 5, Django REST Framework, Django Channels, djangorestframework-simplejwt, PostgreSQL (via `DATABASE_URL`) / SQLite for local dev
