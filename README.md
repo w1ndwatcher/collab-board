@@ -62,6 +62,9 @@ Environment variables (all optional for local dev):
 | `DEBUG` | `True` | Django debug mode |
 | `DATABASE_URL` | `sqlite:///db.sqlite3` | DB connection string |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Allowed CORS origins |
+| `AI_API_KEY` | `<qroq_api_key>` | Integrate LLM |
+| `AI_API_URL` | `<qroq_api_url>` | Chat completion |
+| `AI_MODEL` | `openai/gpt-oss-20b` | LLM |
 
 ### Frontend
 
@@ -114,12 +117,12 @@ frontend's WebSocket handler applies them straight to local state via
 
 ## Future Scope
 
-- **Board permissions / ownership** — boards are currently unauthenticated-by-URL and editable by any logged-in user. Adding board owners, member invites, and view/edit roles is the next natural step.
-- **Redis channel layer** — switch from the in-memory layer to Redis so multiple backend instances can share realtime state.
-- **Card comments & activity log** — an audit trail of who changed what and when.
-- **Card details modal** — descriptions, due dates, labels, and checklists.
-- **Rich assignee picker** — search-as-you-type, initials avatars, and multi-assignee support.
-- **Persistence of the auth session** — refresh-token rotation and automatic access-token refresh on 401.
-- **Tests** — comprehensive backend unit/API tests and frontend component tests.
-- **Search & filtering** — search cards by title, filter by assignee or column.
-- **Deployment** — Dockerfiles, a `docker-compose` stack (Django + Daphne + Redis + Postgres + Vite), and CI/CD.
+- **Board permissions / ownership** - boards are currently unauthenticated-by-URL and editable by any logged-in user. Adding board owners, member invites, and view/edit roles is the next natural step.
+- **Redis channel layer** - switch from the in-memory layer to Redis so multiple backend instances can share realtime state.
+- **Card comments & activity log** - an audit trail of who changed what and when.
+- **Card details modal** - descriptions, due dates, labels, and checklists.
+- **Rich assignee picker** - search-as-you-type, initials avatars, and multi-assignee support.
+- **Persistence of the auth session** - refresh-token rotation and automatic access-token refresh on 401.
+- **Tests** - comprehensive backend unit/API tests and frontend component tests.
+- **Search & filtering** - search cards by title, filter by assignee or column.
+- **Deployment** - Dockerfiles, a `docker-compose` stack (Django + Daphne + Redis + Postgres + Vite), and CI/CD.
