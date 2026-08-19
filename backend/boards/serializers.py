@@ -51,9 +51,24 @@ class CardSerializer(serializers.ModelSerializer):
 
 
 class BoardSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(required=True, allow_blank=False)
     cards = CardSerializer(many=True, read_only=True)
 
     class Meta:
         model = Board
         fields = ["id", "name", "created_at", "cards"]
         read_only_fields = ["id", "created_at"]
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Board name is required.")
+        if len(value) < 2:
+            raise serializers.ValidationError(
+                "Board name must be at least 2 characters."
+            )
+        if not any(ch.isalnum() for ch in value):
+            raise serializers.ValidationError(
+                "Board name must contain letters or numbers."
+            )
+        return value

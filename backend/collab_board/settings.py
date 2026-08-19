@@ -2,6 +2,9 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -85,7 +88,24 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.AnonRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "user": "120/min",
+        "anon": "20/min",
+        "summary": "5/min",
+    },
 }
+
+# AI board summary — the key stays server-side and is never exposed to the
+# frontend. Overridable via environment variables.
+AI_API_KEY = os.environ.get("AI_API_KEY", "")
+AI_MODEL = os.environ.get("AI_MODEL", "openai/gpt-oss-20b")
+AI_API_URL = os.environ.get(
+    "AI_API_URL", "https://api.openai.com/v1/chat/completions"
+)
 
 AUTH_PASSWORD_VALIDATORS = [
     {
