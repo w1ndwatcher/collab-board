@@ -62,8 +62,8 @@ Environment variables (all optional for local dev):
 | `DEBUG` | `True` | Django debug mode |
 | `DATABASE_URL` | `sqlite:///db.sqlite3` | DB connection string |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | Allowed CORS origins |
-| `AI_API_KEY` | `<qroq_api_key>` | Integrate LLM |
-| `AI_API_URL` | `<qroq_api_url>` | Chat completion |
+| `AI_API_KEY` | `<groq_api_key>` | Integrate LLM |
+| `AI_API_URL` | `<groq_api_url>` | Chat completion |
 | `AI_MODEL` | `openai/gpt-oss-20b` | LLM |
 
 ### Frontend
