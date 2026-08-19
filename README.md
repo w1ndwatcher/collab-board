@@ -10,16 +10,16 @@ A real-time collaborative kanban board. Users register and log in, create boards
 
 ## Features
 
-- **Authentication** — email + password registration and login, JWT access/refresh tokens, route protection and 401 auto-redirect on the frontend.
-- **Boards** — create boards, list existing boards on the home page, open any board by URL (`/board/:boardId`). Boards are currently shared by URL and accessible to any authenticated user.
-- **Kanban columns** — To Do / Doing / Done, with cards grouped by column and ordered by a gap-based `position` float so moving one card never renumbers a column.
-- **Drag-and-drop** — reorder within a column and move cards across columns (including into empty columns). Moves persist via PATCH with an optimistic update and a conflict check.
-- **Live collaboration** — WebSocket events (`card_created`, `card_updated`, `card_moved`, `card_deleted`) update every connected client's state directly; no refetch.
-- **Inline card editing** — click a card title to edit it in place (Enter/blur saves, Escape cancels, empty reverts).
-- **Attribution & avatars** — each card tracks creator, last updater, and assignee. Small C/U/A initial badges show attribution; hovering a card shows a full summary of all three roles.
-- **Assignee assignment** — pick a user from a dropdown (fetched once per board); assign or unassign a card.
-- **Conflict detection** — PATCHes send `expected_updated_at`; a 409 means someone else changed the card first, and the UI adopts the server version with a "changed by someone else" indicator.
-- **Optimistic UI** — title, move, and assignee changes apply locally first, then reconcile with the server response.
+- **Authentication** - email + password registration and login, JWT access/refresh tokens, route protection and 401 auto-redirect on the frontend.
+- **Boards** - create boards, list existing boards on the home page, open any board by URL (`/board/:boardId`). Boards are currently shared by URL and accessible to any authenticated user.
+- **Kanban columns** - To Do / Doing / Done, with cards grouped by column and ordered by a gap-based `position` float so moving one card never renumbers a column.
+- **Drag-and-drop** - reorder within a column and move cards across columns (including into empty columns). Moves persist via PATCH with an optimistic update and a conflict check.
+- **Live collaboration** - WebSocket events (`card_created`, `card_updated`, `card_moved`, `card_deleted`) update every connected client's state directly; no refetch.
+- **Inline card editing** - click a card title to edit it in place (Enter/blur saves, Escape cancels, empty reverts).
+- **Attribution & avatars** - each card tracks creator, last updater, and assignee. Small C/U/A initial badges show attribution; hovering a card shows a full summary of all three roles.
+- **Assignee assignment** - pick a user from a dropdown (fetched once per board); assign or unassign a card.
+- **Conflict detection** - PATCHes send `expected_updated_at`; a 409 means someone else changed the card first, and the UI adopts the server version with a "changed by someone else" indicator.
+- **Optimistic UI** - title, move, and assignee changes apply locally first, then reconcile with the server response.
 
 ## Project Layout
 
